@@ -1124,7 +1124,9 @@ class DeflateThreadRandomAccess : public DeflateThread
             if (unlikely(res == block_result::SUCCESS && dummy_win.size() >= min_block_size)) {
                 PRINT_DEBUG("%p Candidate block start at %lubits\n", (void*)this, pos);
                 _in_stream.set_position_bits(pos);
-                _up_stream->set_end_block(pos); // This is not even needed !
+                if ( _up_stream != nullptr ) {
+                    _up_stream->set_end_block(pos); // This is not even needed !
+                }
                 return pos;
             }
 
