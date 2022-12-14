@@ -39,11 +39,12 @@
 
 struct options
 {
-    bool     count_lines;
-    unsigned nthreads;
+    bool     count_lines{ false };
+    unsigned nthreads{ 1 };
+    unsigned chunkSize{ 32U << 20 };  // 32 MiB
 };
 
-static const tchar* const optstring = T(":hnlt:V");
+static const tchar* const optstring = T(":hnls:t:V");
 
 static void
 show_usage(FILE* fp)
@@ -54,6 +55,7 @@ show_usage(FILE* fp)
             "\n"
             "Options:\n"
             "  -l        count line instead of content to standard output\n"
+            "  -s n      use a chunk size of n kiB\n"
             "  -t n      use n threads\n"
             "  -h        print this help\n"
             "  -V        show version and legal information\n",
@@ -119,11 +121,11 @@ decompress_file(const tchar* path, const struct options* options)
     in_p = static_cast<const byte*>(in.mmap_mem);
     if (options->count_lines) {
         LineCounter line_counter{};
-        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, line_counter, nullptr);
+        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, line_counter, nullptr, options->chunkSize);
     } else {
         OutputConsumer output{};
         ConsumerSync   sync{};
-        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, output, &sync);
+        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, output, &sync, options->chunkSize);
     }
 
     ret = 0;
@@ -162,6 +164,10 @@ tmain(int argc, tchar* argv[])
                  */
                 break;
 
+            case 's':
+                options.chunkSize = unsigned(atoi(toptarg)) * 1024U;
+                fprintf(stderr, "using %d B as chunk size\n", options.chunkSize);
+                break;
             case 't':
                 options.nthreads = unsigned(atoi(toptarg));
                 fprintf(stderr, "using %d threads for decompression (experimental)\n", options.nthreads);

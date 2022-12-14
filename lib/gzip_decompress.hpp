@@ -41,7 +41,8 @@
 
 template<typename Consumer>
 static enum libdeflate_result
-libdeflate_gzip_decompress(const byte* in, size_t in_nbytes, unsigned nthreads, Consumer& consumer, ConsumerSync* sync)
+libdeflate_gzip_decompress(const byte* in, size_t in_nbytes, unsigned nthreads, Consumer& consumer, ConsumerSync* sync,
+                           size_t chunkSize = 32ULL << 20 /* 32 MiB */)
 {
     // FIXME: handle header parsing inside DeflateThread*, allowing multimember gzip files
     InputStream in_stream2(in, in_nbytes);
@@ -62,8 +63,22 @@ libdeflate_gzip_decompress(const byte* in, size_t in_nbytes, unsigned nthreads, 
 
     threads.reserve(nthreads);
 
+    /**
+     * Timings for different chunk sizes:
+     * @verbatim
+     *     Times:
+     *  1 MiB 9.331s 9.294s
+     *  2 MiB 7.550s 7.588s
+     *  8 MiB 4.757s 4.690s
+     * 16 MiB 4.486s 4.498s
+     * 32 MiB 4.327s 4.377s
+     * 64 MiB 4.342s 4.333s
+     * @endverbatim
+     * 32 MiB is the first for which runtime is not not improving any further.
+     * Therefore, it looks like this hyperparameter optimization was already correctly executed.
+     */
     // Sections of file decompressed sequentially
-    size_t max_section_size = nthreads * (32ull << 20); // 32MB per thread
+    size_t max_section_size = nthreads * chunkSize;
     size_t section_size     = std::min(max_section_size, in_size);
     size_t n_sections       = (in_size + section_size - 1) / section_size;
     if (nthreads == 1) n_sections = 1;
