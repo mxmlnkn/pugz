@@ -42,9 +42,10 @@ struct options
     bool     count_lines{ false };
     unsigned nthreads{ 1 };
     unsigned chunkSize{ 32U << 20 };  // 32 MiB
+    bool     unsynchronized{ false };
 };
 
-static const tchar* const optstring = T(":hnls:t:V");
+static const tchar* const optstring = T(":hnls:t:uV");
 
 static void
 show_usage(FILE* fp)
@@ -57,6 +58,7 @@ show_usage(FILE* fp)
             "  -l        count line instead of content to standard output\n"
             "  -s n      use a chunk size of n kiB\n"
             "  -t n      use n threads\n"
+            "  -u        Write out results unordered to increase speed\n"
             "  -h        print this help\n"
             "  -V        show version and legal information\n",
             program_invocation_name);
@@ -100,6 +102,7 @@ stat_file(struct file_stream* in, stat_t* stbuf, bool allow_hard_links)
     return 0;
 }
 
+
 static int
 decompress_file(const tchar* path, const struct options* options)
 {
@@ -125,7 +128,8 @@ decompress_file(const tchar* path, const struct options* options)
     } else {
         OutputConsumer output{};
         ConsumerSync   sync{};
-        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, output, &sync, options->chunkSize);
+        libdeflate_gzip_decompress(in_p, in.mmap_size, options->nthreads, output,
+                                   options->unsynchronized ? nullptr : &sync, options->chunkSize);
     }
 
     ret = 0;
@@ -172,6 +176,7 @@ tmain(int argc, tchar* argv[])
                 options.nthreads = unsigned(atoi(toptarg));
                 fprintf(stderr, "using %d threads for decompression (experimental)\n", options.nthreads);
                 break;
+            case 'u': options.unsynchronized = true; break;
             case 'V': show_version(); return 0;
             default: show_usage(stderr); return 1;
         }
